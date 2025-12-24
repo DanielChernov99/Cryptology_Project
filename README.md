@@ -23,19 +23,11 @@ The system combines symmetric encryption, public-key key exchange, and digital s
 - Digital Signature Algorithm (DSA)
 - Provides message authenticity and integrity verification
 
-### Hash Functions
-- Used only where permitted for integrity checks and digital signatures
 
 ## Security Properties
 - **Confidentiality:** Ensured by GOST encryption in CBC mode
 - **Integrity:** Ensured through cryptographic hashing and signature verification
 - **Authenticity:** Ensured using DSA digital signatures
-
-## Implementation Notes
-- No use of high-level cryptographic libraries
-- Cryptographic primitives are implemented manually
-- Standalone system (no client–server architecture required)
-- Focus on correctness, clarity, and academic evaluation
 
 ## Academic Context
 This project was developed as part of a university cryptography course and demonstrates practical implementation of block cipher modes of operation, key exchange mechanisms, and digital signature schemes.
