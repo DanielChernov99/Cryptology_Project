@@ -2,6 +2,7 @@ import os
 from utils.encoding import int_to_bytes
 
 # --- Curve Parameters (secp256k1 - Bitcoin's Curve) ---
+# y^2 = x^3 + 7 over F256-bit prime field
 P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
 A = 0
 B = 7
