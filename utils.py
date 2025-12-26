@@ -1,3 +1,6 @@
+import hashlib
+
+
 def str_to_bytes(text: str) -> bytes:
     """
     Convert string to bytes using UTF-8 encoding.
@@ -45,3 +48,21 @@ def int_to_bytes(value: int, length: int = None) -> bytes:
     # Calculate minimum length needed dynamically
     needed_bytes = (value.bit_length() + 7) // 8
     return value.to_bytes(needed_bytes, byteorder="big")
+
+def generate_iv(block_size: int) -> bytes:
+    """
+    Generate a cryptographically secure random IV.
+    """
+    return os.urandom(block_size)
+
+def hash_bytes(data: bytes) -> bytes:
+    """
+    Compute SHA-256 hash of input data.
+    """
+    return hashlib.sha256(data).digest()
+
+def hash_to_int(data: bytes) -> int:
+    """
+    Hash data and convert to integer (used in DSA).
+    """
+    return int.from_bytes(hash_bytes(data), byteorder="big")

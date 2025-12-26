@@ -1,5 +1,5 @@
 import os
-from utils.random_utils import generate_iv
+from utils import generate_iv
 
 # ======================================================
 # GOST 28147-89 Parameters

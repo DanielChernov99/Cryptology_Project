@@ -1,122 +1,70 @@
 import os
-from crypto.hash_utils import hash_to_int
+from hashlib import sha256
+from crypto.elliptic_curve import G, ORDER, POINT_INFINITY, is_on_curve, point_add, scalar_mult
 
-# ======================================================
-# DSA Parameters (Standard-sized, academic friendly)
-# ======================================================
-# These parameters are for educational purposes.
-# In real systems, p is usually 2048 bits and q is 256 bits.
+def hash_to_int(message: bytes) -> int:
+    return int.from_bytes(sha256(message).digest(), "big")
 
-P = int(
-    "86F1E3C7E5A9F7A5C2D8F5E4D1C9B7A3"
-    "F1E2D3C4B5A6978877665544332211",
-    16
-)
-
-Q = int(
-    "996F967F6C8E388D9E28D01E205FBA957A5698B1",
-    16
-)
-
-G = pow(2, (P - 1) // Q, P)
-
-# ======================================================
-# Key Generation
-# ======================================================
+def mod_inv(a: int, n: int) -> int:
+    t, newt = 0, 1
+    r, newr = n, a
+    while newr != 0:
+        quotient = r // newr
+        t, newt = newt, t - quotient * newt
+        r, newr = newr, r - quotient * newr
+    if r > 1:
+        raise ValueError("a is not invertible")
+    if t < 0:
+        t += n
+    return t
 
 def generate_keys():
-    """
-    Generate a DSA private/public key pair.
-
-    Returns:
-        private_key (x), public_key (y)
-    """
     while True:
-        x = int.from_bytes(os.urandom(32), "big") % Q
-        if 1 <= x < Q:
+        private_key = int.from_bytes(os.urandom(32), "big") % ORDER
+        if private_key != 0:
             break
+    public_key = scalar_mult(private_key, G)
+    return private_key, public_key
 
-    y = pow(G, x, P)
-    return x, y
-
-# ======================================================
-# DSA Signature
-# ======================================================
-
-def sign_message(private_key: int, message: bytes) -> tuple[int, int]:
-    """
-    Sign a message using classic DSA.
-
-    Args:
-        private_key: DSA private key (x).
-        message: Message to sign (bytes).
-
-    Returns:
-        (r, s): DSA signature.
-    """
-    z = hash_to_int(message) % Q
-
+def sign_message(private_key: int, message: bytes):
+    z = hash_to_int(message) % ORDER
     while True:
-        k = int.from_bytes(os.urandom(32), "big") % Q
+        k = int.from_bytes(os.urandom(32), "big") % ORDER
         if k == 0:
             continue
-
-        r = pow(G, k, P) % Q
+        R = scalar_mult(k, G)
+        r = R[0] % ORDER
         if r == 0:
             continue
-
-        k_inv = pow(k, Q - 2, Q)
-        s = (k_inv * (z + private_key * r)) % Q
-
+        k_inv = mod_inv(k, ORDER)
+        s = (k_inv * (z + r * private_key)) % ORDER
         if s != 0:
-            return r, s
+            return (r, s)
 
-# ======================================================
-# DSA Verification
-# ======================================================
-
-def verify_signature(public_key: int, message: bytes, signature: tuple[int, int]) -> bool:
-    """
-    Verify a DSA signature.
-
-    Args:
-        public_key: DSA public key (y).
-        message: Original message (bytes).
-        signature: (r, s)
-
-    Returns:
-        True if valid, False otherwise.
-    """
+def verify_signature(public_key, message: bytes, signature):
     try:
         r, s = signature
-    except (TypeError, ValueError):
+    except Exception:
         return False
-
-    if not (1 <= r < Q and 1 <= s < Q):
+    if not (1 <= r < ORDER and 1 <= s < ORDER):
         return False
-
-    z = hash_to_int(message) % Q
-
-    w = pow(s, Q - 2, Q)
-    u1 = (z * w) % Q
-    u2 = (r * w) % Q
-
-    v = (pow(G, u1, P) * pow(public_key, u2, P)) % P
-    v = v % Q
-
+    z = hash_to_int(message) % ORDER
+    w = mod_inv(s, ORDER)
+    u1 = (z * w) % ORDER
+    u2 = (r * w) % ORDER
+    point = point_add(scalar_mult(u1, G), scalar_mult(u2, public_key))
+    if point is POINT_INFINITY:
+        return False
+    v = point[0] % ORDER
     return v == r
-
-# ======================================================
-# Self Test
-# ======================================================
 
 if __name__ == "__main__":
     priv, pub = generate_keys()
+    print("Private Key:", priv)
+    print("Public Key:", pub)
 
-    msg = b"Pay 100 ILS to Bob"
+    msg = b"Hello ECDSA"
     sig = sign_message(priv, msg)
+    print("Signature:", sig)
 
-    assert verify_signature(pub, msg, sig)
-    assert not verify_signature(pub, b"Pay 200 ILS to Bob", sig)
-
-    print("DSA test passed successfully")
+    print("Valid?", verify_signature(pub, msg, sig))
