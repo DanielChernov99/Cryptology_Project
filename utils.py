@@ -1,5 +1,5 @@
 import hashlib
-
+import os
 
 def str_to_bytes(text: str) -> bytes:
     """
