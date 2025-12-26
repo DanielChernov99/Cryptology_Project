@@ -1,119 +1,122 @@
 import os
-from crypto.ecdh import (
-    G,
-    ORDER,
-    _scalar_mult,
-    _point_add,
-    _is_on_curve,
-    POINT_INFINITY
-)
 from crypto.hash_utils import hash_to_int
 
+# ======================================================
+# DSA Parameters (Standard-sized, academic friendly)
+# ======================================================
+# These parameters are for educational purposes.
+# In real systems, p is usually 2048 bits and q is 256 bits.
+
+P = int(
+    "86F1E3C7E5A9F7A5C2D8F5E4D1C9B7A3"
+    "F1E2D3C4B5A6978877665544332211",
+    16
+)
+
+Q = int(
+    "996F967F6C8E388D9E28D01E205FBA957A5698B1",
+    16
+)
+
+G = pow(2, (P - 1) // Q, P)
 
 # ======================================================
-# ECDSA - Elliptic Curve Digital Signature Algorithm
+# Key Generation
+# ======================================================
+
+def generate_keys():
+    """
+    Generate a DSA private/public key pair.
+
+    Returns:
+        private_key (x), public_key (y)
+    """
+    while True:
+        x = int.from_bytes(os.urandom(32), "big") % Q
+        if 1 <= x < Q:
+            break
+
+    y = pow(G, x, P)
+    return x, y
+
+# ======================================================
+# DSA Signature
 # ======================================================
 
 def sign_message(private_key: int, message: bytes) -> tuple[int, int]:
     """
-    Sign a message using ECDSA.
+    Sign a message using classic DSA.
 
     Args:
-        private_key: Signer's private key (int).
+        private_key: DSA private key (x).
         message: Message to sign (bytes).
 
     Returns:
-        (r, s): ECDSA signature.
+        (r, s): DSA signature.
     """
-    # Hash message and reduce modulo curve order
-    z = hash_to_int(message) % ORDER
+    z = hash_to_int(message) % Q
 
     while True:
-        # Generate nonce k such that 1 <= k < ORDER
-        k = int.from_bytes(os.urandom(32), "big") % ORDER
+        k = int.from_bytes(os.urandom(32), "big") % Q
         if k == 0:
             continue
 
-        # Compute R = k * G
-        R = _scalar_mult(k, G)
-        if R is POINT_INFINITY:
-            continue
-
-        r = R[0] % ORDER
+        r = pow(G, k, P) % Q
         if r == 0:
             continue
 
-        # Compute s = k^-1 * (z + r * d) mod ORDER
-        k_inv = pow(k, ORDER - 2, ORDER)
-        s = (k_inv * (z + r * private_key)) % ORDER
+        k_inv = pow(k, Q - 2, Q)
+        s = (k_inv * (z + private_key * r)) % Q
 
         if s != 0:
             return r, s
 
+# ======================================================
+# DSA Verification
+# ======================================================
 
-def verify_signature(public_key_point, message: bytes, signature: tuple[int, int]) -> bool:
+def verify_signature(public_key: int, message: bytes, signature: tuple[int, int]) -> bool:
     """
-    Verify an ECDSA signature.
+    Verify a DSA signature.
 
     Args:
-        public_key_point: Signer's public key (EC point).
+        public_key: DSA public key (y).
         message: Original message (bytes).
-        signature: (r, s) tuple.
+        signature: (r, s)
 
     Returns:
-        True if signature is valid, False otherwise.
+        True if valid, False otherwise.
     """
     try:
         r, s = signature
     except (TypeError, ValueError):
         return False
 
-    # Validate signature range
-    if not (1 <= r < ORDER and 1 <= s < ORDER):
+    if not (1 <= r < Q and 1 <= s < Q):
         return False
 
-    # Validate public key
-    if public_key_point is POINT_INFINITY:
-        return False
+    z = hash_to_int(message) % Q
 
-    if not _is_on_curve(public_key_point):
-        return False
+    w = pow(s, Q - 2, Q)
+    u1 = (z * w) % Q
+    u2 = (r * w) % Q
 
-    # Hash message
-    z = hash_to_int(message) % ORDER
+    v = (pow(G, u1, P) * pow(public_key, u2, P)) % P
+    v = v % Q
 
-    # Compute w = s^-1 mod ORDER
-    w = pow(s, ORDER - 2, ORDER)
-
-    # Compute u1, u2
-    u1 = (z * w) % ORDER
-    u2 = (r * w) % ORDER
-
-    # Compute P = u1*G + u2*Q
-    p1 = _scalar_mult(u1, G)
-    p2 = _scalar_mult(u2, public_key_point)
-    P = _point_add(p1, p2)
-
-    if P is POINT_INFINITY:
-        return False
-
-    # Signature valid if x-coordinate matches r
-    return (P[0] % ORDER) == r
-
+    return v == r
 
 # ======================================================
 # Self Test
 # ======================================================
 
 if __name__ == "__main__":
-    from crypto.ecdh import generate_keys
-
     priv, pub = generate_keys()
-    msg = b"Pay 100 ILS to Bob"
 
+    msg = b"Pay 100 ILS to Bob"
     sig = sign_message(priv, msg)
 
     assert verify_signature(pub, msg, sig)
     assert not verify_signature(pub, b"Pay 200 ILS to Bob", sig)
 
-    print("ECDSA test passed successfully")
+    print("DSA test passed successfully")
