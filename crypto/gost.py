@@ -19,7 +19,6 @@ S_BOX = [
     [1,15,13,0,5,7,10,4,9,2,3,14,6,11,8,12],
 ]
 
-# ======================================================
 # Helper Functions
 # ======================================================
 
@@ -45,7 +44,7 @@ def _unpad(data: bytes) -> bytes:
 def _split_blocks(data: bytes):
     return [data[i:i + BLOCK_SIZE] for i in range(0, len(data), BLOCK_SIZE)]
 
-# ======================================================
+
 # GOST Core Cipher
 # ======================================================
 
@@ -69,6 +68,7 @@ def _round(left: int, right: int, subkey: int):
 
 def _generate_subkeys(key: bytes):
     # Split 256-bit key into 8 32-bit integers (Little Endian)
+    # Little Endian: The least significant byte is stored first (at the lowest address), standard for GOST
     return [
         int.from_bytes(key[i*4:(i+1)*4], "little")
         for i in range(8)
@@ -110,7 +110,7 @@ def _decrypt_block(block: bytes, subkeys):
         left.to_bytes(4, "little")
     )
 
-# ======================================================
+
 # Public API: CBC Mode (Adjusted for Main.py)
 # ======================================================
 
