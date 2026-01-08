@@ -111,7 +111,8 @@ class SecureMessenger:
             found_count += 1
             sender_name = packet["sender"]
             
-            # self._log("INBOX CHECK", f"Processing message from '{sender_name}'...")
+            # --- START LOGGING FOR RECEIVER ---
+            self._log("INBOX RECEIVE", f"Processing new message from '{sender_name}'...")
 
             # 1. Get Sender's Public Keys (for verification and ECDH)
             sender_keys = self.user_manager.get_public_keys(sender_name)
@@ -123,6 +124,7 @@ class SecureMessenger:
             # Using My Private + Sender's Public
             try:
                 shared_secret = compute_shared_secret(active_user["ecdh_priv"], sender_keys["ecdh"])
+                self._log("ECDH (RECEIVER)", f"Computed Shared Secret: {shared_secret.hex().upper()}\n[CHECK] Compare this with Sender's log to verify match.")
             except:
                 messages.append({"sender": sender_name, "error": "ECDH Failed"})
                 continue
@@ -130,24 +132,29 @@ class SecureMessenger:
             # 3. Decrypt (GOST)
             iv = hex_to_bytes(packet["iv"])
             ciphertext = hex_to_bytes(packet["ciphertext"])
+            
+            self._log("DECRYPTION START", f"Received Ciphertext: {packet['ciphertext']}\nIV: {packet['iv']}\nDecrypting using Shared Secret...")
+
             try:
                 decrypted_bytes = decrypt_cbc(ciphertext, shared_secret, iv)
-            except:
+                decrypted_text_str = bytes_to_str(decrypted_bytes)
+                self._log("DECRYPTION SUCCESS", f"Decrypted Content: '{decrypted_text_str}'")
+            except Exception as e:
+                self._log("DECRYPTION ERROR", f"Failed to decrypt: {e}")
                 messages.append({"sender": sender_name, "error": "Decryption Failed"})
                 continue
 
             # 4. Verify Signature (DSA)
             # Using Sender's DSA Public Key
             signature = tuple(packet["signature"]) # Convert list back to tuple
+            self._log("SIGNATURE VERIFICATION", f"Verifying signature {signature} against decrypted content...")
+            
             is_valid = verify_signature(sender_keys["dsa"], decrypted_bytes, signature)
 
             status = "Verified" if is_valid else "FAKE/TAMPERED"
             
-            # Only log detailed crypto steps for new/unread messages if you want to avoid spam,
-            # but for this demo, we can log the verification result.
             if is_valid:
-                pass 
-                # self._log("VERIFICATION SUCCESS", f"Message from {sender_name} verified successfully.")
+                self._log("VERIFICATION RESULT", "Signature VALID. The message is authentic and has not been changed.")
             else:
                 self._log("SECURITY WARNING", f"Invalid signature detected from {sender_name}!")
 
@@ -158,8 +165,7 @@ class SecureMessenger:
                 "status": status
             })
 
-        if found_count > 0:
-             # self._log("INBOX REFRESH", f"Found {found_count} messages for user.")
-             pass
+            # Delete file after reading (optional, to avoid re-reading logs repeatedly)
+            # os.remove(filepath) 
 
         return messages

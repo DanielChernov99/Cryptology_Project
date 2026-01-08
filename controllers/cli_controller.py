@@ -9,9 +9,16 @@ from core.secure_messenger import SecureMessenger
 
 class CLIController:
     def __init__(self):
-        # Initialize Core Logic
-        self.user_manager = UserManager()
-        self.messenger = SecureMessenger(self.user_manager)
+        # Define a callback to print logs to the console
+        def log_printer(title, details):
+            print(f"\n[LOG] === {title} ===")
+            print(details)
+            print("-" * 40)
+
+        # Initialize Core Logic with the logger callback
+        # This connects the print messages to the core logic events
+        self.user_manager = UserManager(debug_callback=log_printer)
+        self.messenger = SecureMessenger(self.user_manager, debug_callback=log_printer)
         self.current_user = None
 
     def run(self):
@@ -60,6 +67,7 @@ class CLIController:
         if choice == '1':
             recipient = input("To (Username): ")
             content = input("Message: ")
+            # The log_printer will handle printing the encryption details during this call
             success, msg = self.messenger.send_message(self.current_user, recipient, content)
             if success:
                 print(f"[SUCCESS] {msg}")
@@ -67,6 +75,7 @@ class CLIController:
                 print(f"[ERROR] {msg}")
 
         elif choice == '2':
+            # The log_printer will handle printing the decryption details during this call
             messages = self.messenger.check_inbox(self.current_user)
             if not messages:
                 print("No new messages.")
